@@ -30,7 +30,42 @@ void execute(char * executeInput) {
 	
 	if(pidProcess == 0) {
 	
-		//TODO: I/O redirection (to-file and from-file)
+		//I/O redirection (to-file and from-file)
+		
+		if(strchr(currentInput, '>') != NULL ){
+			
+			char *ptrToCharacter = strchr(currentInput, '>');
+			char *copyOfInput = strdup(executeInput);
+			int indexOfCharacter = (int)(ptrToCharacter - currentInput);
+			int lengthOfInput = strlen(currentInput);
+			
+			strncopy(copyOfInput, &currentInput[indexOfCharacter+2], lengthOfInput);
+			
+			int newOutput = open(copyOfInput, O_TRUNC | O_WRONLY | O_CREAT, S_IRUSR | S_IWGRP | S_IRGRP | S_IWUSR);
+			
+			dup2(newOutput, 1);
+			close(newOutput);
+			
+			
+			currentInput[indexOfCharacter-1] = '\0';
+			
+		}else if(strchr(currentInput, '<' ) != NULL) {
+			
+			char *ptrToCharacter0 = strchr(currentInput, '<');
+			char *copyOfInput0 = strdup(currentInput);
+			int indexOfCharacter0 = (int)(ptrToCharacter0 - currentInput);
+			int lengthOfInput0 = strlen(currentInput);
+			
+			strncpy(copyOfInput0, &currentInput[indexOfCharacter0+2], lengthOfInput0);
+			
+			int newInput = open(copyOfInput0, O_RDONLY);
+			
+			dup2(newInput, 0);
+			close(newInput);
+			
+			
+			currentInput[0] = '\0';
+		}
 		
 		
 		if(strlen(currentInput) > 0 ) {
