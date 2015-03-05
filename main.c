@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
-
+#include <errno.h>
 
 //TODO: Implement I/O redirection & clean-up 
 void execute(char * executeInput) {
@@ -59,18 +59,39 @@ void execute(char * executeInput) {
 }
 
 //TODO: Implement cd
-void cd() {
+void cd(const char* path) {
+  if(path == NULL) {
+    if (chdir(getenv("HOME")) == -1) 
+      printf("<%s> is an invalid path \n", strerror(errno));
+    } else {
+      if (chdir(path) == -1)
+        printf("<%s> is an invalid path.\n", strerror(errno));
+    }
 }
 
 //TODO: Implement pwd
 void pwd() {
+  char currDir[1024];
+  getcwd(currDir, sizeof(currDir));
+  printf("%s\n", currDir);
 }
 
 
 void parse(char *input) {
   int count;
   char * word;
-  word = strtok(input, " ");
+
+  word = strtok(input, " \n");
+
+  if (strcmp("cd", word) == 0) {
+    word = strtok(NULL, " \n");
+    printf("%d", strlen(word));
+    if (word != NULL) {
+      cd(word);
+    }
+  } else if (strcmp("pwd", word) == 0) {
+    pwd();
+  }
 
   while (word != NULL) {
     count = count + 1;
