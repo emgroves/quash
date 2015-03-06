@@ -2,8 +2,24 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
 #include <errno.h>
+
+#include <readline/readline.h>
+#include <readline/history.h>
+
+struct backgroundTask {
+  int pid;
+  char * task;
+  int id;
+};
+
+static int *execTaskCount = 0;
+static struct backgroundTask tasks[100];
 
 //TODO: Implement I/O redirection & clean-up 
 void execute(char * executeInput) {
@@ -12,7 +28,7 @@ void execute(char * executeInput) {
 	char * tokenizedInput = strtok(executeInput, " \n");
 	
 	//find a better way to do this... removes newlines
-	char * ptrA; 
+	char * ptrA;
 	char * ptrB;
   	for (ptrA=ptrB=currentInput;*ptrB=*ptrA;ptrB+=(*ptrA++!='\n'));
 	//END
@@ -39,7 +55,7 @@ void execute(char * executeInput) {
 			int indexOfCharacter = (int)(ptrToCharacter - currentInput);
 			int lengthOfInput = strlen(currentInput);
 			
-			strncopy(copyOfInput, &currentInput[indexOfCharacter+2], lengthOfInput);
+			strncpy(copyOfInput, &currentInput[indexOfCharacter+2], lengthOfInput);
 			
 			int newOutput = open(copyOfInput, O_TRUNC | O_WRONLY | O_CREAT, S_IRUSR | S_IWGRP | S_IRGRP | S_IWUSR);
 			
@@ -69,12 +85,12 @@ void execute(char * executeInput) {
 		
 		
 		if(strlen(currentInput) > 0 ) {
-			if(execlp(tokenizedInput, tokenizedInput, currentInput, (char *)NULL) < 0) { //see if this works, if not you can edit out the (char *)
+			if(execlp(tokenizedInput, tokenizedInput, currentInput, NULL) < 0) { //see if this works, if not you can edit out the (char *)
 				fprintf(stderr, "\nError: incorrect input (input remaining)\n"); //might need to correct these error messages, i think this is what they handle
 				exit(0);
 			}
 		}else{
-			if(execlp(tokenizedInput, tokenizedInput, (char *)NULL) < 0) {
+			if(execlp(tokenizedInput, tokenizedInput, NULL) < 0) {
 				fprintf(stderr, "\nError: incorrect input (no input remaining)\n");
 				exit(0);
 			}
@@ -93,8 +109,8 @@ void execute(char * executeInput) {
 	}
 }
 
-//TODO: Implement cd
 void cd(const char* path) {
+  //make sure to check for invalid pathing
   if(path == NULL) {
     if (chdir(getenv("HOME")) == -1) 
       printf("<%s> is an invalid path \n", strerror(errno));
@@ -104,52 +120,183 @@ void cd(const char* path) {
     }
 }
 
-//TODO: Implement pwd
 void pwd() {
   char currDir[1024];
+  //get current working directory and print it
   getcwd(currDir, sizeof(currDir));
   printf("%s\n", currDir);
 }
 
+//we have to remove spaces in input to parse it
+char *remove_spaces(char *s) {
+  char *temp;
 
-void parse(char *input) {
-  int count;
-  char * word;
-
-  word = strtok(input, " \n");
-
-  if (strcmp("cd", word) == 0) {
-    word = strtok(NULL, " \n");
-    printf("%d", strlen(word));
-    if (word != NULL) {
-      cd(word);
-    }
-  } else if (strcmp("pwd", word) == 0) {
-    pwd();
+  while (isspace(*s)) {
+    s++;
   }
 
-  while (word != NULL) {
-    count = count + 1;
-    printf("%s\n", word);
-    word = strtok(NULL, " ");
+  if (*s == 0) {
+    return s;
+  }
+
+  temp = s + strlen(s) - 1;
+
+  while (temp > s && isspace(*temp)) {
+    temp--;
+  }
+
+  *(temp+1) = 0;
+
+  return s;
+}
+
+void parse(char *input) {
+  int pipefd[2];
+  char * ptrA;
+  char * ptrB;
+
+
+  char * in = strdup(input);
+  char * parsedin = strtok(input, " \n=");
+  char * bgtask = strchr(in, '&');
+  char * pipetask = strchr(in, '|');
+  char * cmd = strdup(parsedin);
+
+  int setcheck = strcmp("set", parsedin);
+
+  int bgloc = bgtask - in;
+  int pipeloc = pipetask - in;
+
+  int count;
+
+  //remove newlines
+  for (ptrA=ptrB=in;*ptrB=*ptrA;ptrB+=(*ptrA++!='\n'));
+
+
+  if (setcheck == 0) {
+    parsedin = strtok(NULL," \n=");
+    char * assign = strtok(NULL, "\n =");
+    //remove quotes
+    for (ptrA=ptrB=assign;*ptrB=*ptrA;ptrB+=(*ptrA++!='\''));
+    //set environment
+    setenv(parsedin, assign, 1);
+  }
+
+
+  if (pipetask != NULL) {
+    if (pipe(pipefd) == -1) {
+      printf("error");
+      exit(1);
+    }
+
+    char * fst = strdup(in);
+    char * snd = strdup(in);
+
+    printf("%d \n", pipetask);
+    strncpy(fst, &in[0], pipetask);
+    fst[pipeloc] = '\0';
+    strncpy(snd, &in[pipeloc+2], strlen(in));
+
+    //new process for pipe
+    pid_t p1;
+    p1 = fork();
+    if (p1 == 0) {
+      dup2(pipefd[1], STDOUT_FILENO);
+      parse(remove_spaces(fst));
+      exit(0);
+    }
+
+    pid_t p2;
+    p2 = fork();
+    if (p2 == 0) {
+      dup2(pipefd[0], STDIN_FILENO);
+      parse(remove_spaces(snd));
+      exit(0);
+    }
+  } else if (setcheck != 0) {
+    
+    if (bgtask == NULL) {
+      if (strcmp("cd", parsedin) == 0) {
+        parsedin = strtok(NULL, " \n");
+        cd(parsedin);
+      } else {
+        execute(in);
+      }
+    } else if (bgloc + 1 == strlen(in)) {
+      for (ptrA=ptrB=in;*ptrB=*ptrA;ptrB+=(*ptrA++!='&'));
+      pid_t p1;
+      p1 = fork();
+      pid_t sessionId;
+      if (p1 == 0) {
+        sessionId = setsid();
+        if (sessionId < 0) {
+          printf("Failed to start session");
+          exit(0);
+        }
+        close(pipefd[0]);
+        close(pipefd[1]);
+        close(STDERR_FILENO);
+
+        printf("[%d] executing as a background task\n", getpid());
+        parse(in);
+        printf("[%d] has finished executing\n", getpid());
+        kill(getpid(),-9);
+        printf("%d \n", *execTaskCount);
+        
+        exit(0);
+      } else {
+        //struct a background task
+        struct backgroundTask thisTask = {.id = p1, .pid = *execTaskCount, .task = cmd};
+        tasks[*execTaskCount] = thisTask;
+
+        *execTaskCount = *execTaskCount + 1;
+        
+        //wait for the task..
+        while (waitid(p1, NULL, WEXITED,WNOHANG) > 0) {}
+
+      }
+    } else {
+      printf("Invalid background task entered. \n");
+    }
   }
 
 }
 
 int main(int argc, char **argv, char **envpath) {
-  char input[128];
-  bzero(input, sizeof(input));
+  execTaskCount = mmap(NULL, sizeof *execTaskCount, PROT_READ | PROT_WRITE,  
+              MAP_SHARED | MAP_ANON, -1, 0);
+  *execTaskCount = 0;
 
-  int input_flag = 1;
+  char* input;
+  char* prompt[100];
 
-  do {
-    printf("~> ");
-    fgets(input, sizeof(input), stdin);
-    parse(input);
-    if (strcmp(input,"exit")) {
-      input_flag = 0;
+  char cdir[128];
+  
+  int x = 0;
+  do { 
+    snprintf(prompt, sizeof(prompt), "%s:%s ~> ", getenv("USER"), getcwd(NULL, 1024));
+    input = readline(prompt);
+    
+    if (!input) {
+      break;
     }
-  } while (input_flag);
+
+    while(waitpid(-1, NULL, WNOHANG) > 0) {}
+
+
+    if(strcmp("quit", input) != 0){
+      if(strlen(input) > 1)  {
+        char * ptrA;
+        char * ptrB;
+        for (ptrA=ptrB=input;*ptrB=*ptrA;ptrB+=(*ptrA++!='\n'));
+        
+        parse(remove_spaces(input));
+      }
+    } else {
+      break;
+    }
+    free(input);
+  } while (1);
 
   return 0;
 }
