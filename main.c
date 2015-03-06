@@ -150,6 +150,15 @@ char *remove_spaces(char *s) {
   return s;
 }
 
+void get_current_tasks() {
+  int x;
+  for (x = 0; x < *execTaskCount; x++) {
+    if (kill(tasks[x].pid, 0) == 0) {
+      printf("[%d] %d %s\n", tasks[x].id, tasks[x].pid, tasks[x].task);
+    }
+  }
+}
+
 void parse(char *input) {
   int pipefd[2];
   char * ptrA;
@@ -219,6 +228,8 @@ void parse(char *input) {
       if (strcmp("cd", parsedin) == 0) {
         parsedin = strtok(NULL, " \n");
         cd(parsedin);
+      } else if (strcmp("jobs", parsedin) == 0) {
+        get_current_tasks();
       } else {
         execute(in);
       }
@@ -284,7 +295,7 @@ int main(int argc, char **argv, char **envpath) {
     while(waitpid(-1, NULL, WNOHANG) > 0) {}
 
 
-    if(strcmp("quit", input) != 0){
+    if(strcmp("quit", input) != 0 && strcmp("exit",input) != 0){
       if(strlen(input) > 1)  {
         char * ptrA;
         char * ptrB;
