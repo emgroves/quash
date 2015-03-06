@@ -166,6 +166,8 @@ void parse(char *input) {
 
 
   char * in = strdup(input);
+  
+  
   char * parsedin = strtok(input, " \n=");
   char * bgtask = strchr(in, '&');
   char * pipetask = strchr(in, '|');
@@ -175,9 +177,7 @@ void parse(char *input) {
 
   int bgloc = bgtask - in;
   int pipeloc = pipetask - in;
-
-  int count;
-
+  
   //remove newlines
   for (ptrA=ptrB=in;*ptrB=*ptrA;ptrB+=(*ptrA++!='\n'));
 
@@ -201,23 +201,26 @@ void parse(char *input) {
     char * fst = strdup(in);
     char * snd = strdup(in);
 
-    printf("%d \n", pipetask);
-    strncpy(fst, &in[0], pipetask);
+    printf("%d\n", pipetask);
+    strncpy(fst, &in[0], pipeloc);
     fst[pipeloc] = '\0';
     strncpy(snd, &in[pipeloc+2], strlen(in));
 
     //new process for pipe
     pid_t p1;
+    pid_t p2;
     p1 = fork();
+    printf("HERE###");
     if (p1 == 0) {
+      printf("HERE@@@@");
       dup2(pipefd[1], STDOUT_FILENO);
       parse(remove_spaces(fst));
       exit(0);
     }
 
-    pid_t p2;
     p2 = fork();
     if (p2 == 0) {
+      printf("HERE!!!!!");
       dup2(pipefd[0], STDIN_FILENO);
       parse(remove_spaces(snd));
       exit(0);
