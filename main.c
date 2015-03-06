@@ -201,7 +201,6 @@ void parse(char *input) {
     char * fst = strdup(in);
     char * snd = strdup(in);
 
-    printf("%d\n", pipetask);
     strncpy(fst, &in[0], pipeloc);
     fst[pipeloc] = '\0';
     strncpy(snd, &in[pipeloc+2], strlen(in));
