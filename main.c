@@ -86,12 +86,12 @@ void execute(char * executeInput) {
 		
 		if(strlen(currentInput) > 0 ) {
 			if(execlp(tokenizedInput, tokenizedInput, currentInput, NULL) < 0) { //see if this works, if not you can edit out the (char *)
-				fprintf(stderr, "\nError: incorrect input (input remaining)\n"); //might need to correct these error messages, i think this is what they handle
+				fprintf(stderr, "\nError: invalid input - please try again\n"); //might need to correct these error messages, i think this is what they handle
 				exit(0);
 			}
 		}else{
 			if(execlp(tokenizedInput, tokenizedInput, NULL) < 0) {
-				fprintf(stderr, "\nError: incorrect input (no input remaining)\n");
+				fprintf(stderr, "\nError: invalid input - please try again\n");
 				exit(0);
 			}
 		}
