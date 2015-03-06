@@ -248,11 +248,10 @@ void parse(char *input) {
         close(pipefd[1]);
         close(STDERR_FILENO);
 
-        printf("[%d] executing as a background task\n", getpid());
+        printf("PID='%d' executing as a background task\n", getpid());
         parse(in);
-        printf("[%d] has finished executing\n", getpid());
+        printf("PID='%d' has finished executing\n", getpid());
         kill(getpid(),-9);
-        printf("%d \n", *execTaskCount);
         
         exit(0);
       } else {
