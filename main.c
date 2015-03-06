@@ -210,9 +210,7 @@ void parse(char *input) {
     pid_t p1;
     pid_t p2;
     p1 = fork();
-    printf("HERE###");
     if (p1 == 0) {
-      printf("HERE@@@@");
       dup2(pipefd[1], STDOUT_FILENO);
       parse(remove_spaces(fst));
       exit(0);
@@ -220,7 +218,6 @@ void parse(char *input) {
 
     p2 = fork();
     if (p2 == 0) {
-      printf("HERE!!!!!");
       dup2(pipefd[0], STDIN_FILENO);
       parse(remove_spaces(snd));
       exit(0);
@@ -277,7 +274,7 @@ void parse(char *input) {
 
 int main(int argc, char **argv, char **envpath) {
   execTaskCount = mmap(NULL, sizeof *execTaskCount, PROT_READ | PROT_WRITE,  
-              MAP_SHARED | MAP_ANON, -1, 0);
+              MAP_SHARED | MAP_ANONYMOUS, -1, 0);
   *execTaskCount = 0;
 
   char* input;
